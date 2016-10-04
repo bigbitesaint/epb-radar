@@ -1,0 +1,28 @@
+<resources>
+    <string name="app_name">MapTest</string>
+    <string name="title_activity_maps">Map</string>
+    <string name="start_button">Start</string>
+    <string name="stop_button">Stop</string>
+    <string name="start_mission">開始稽查</string>
+    <string name="stop_mission">完成稽查</string>
+    <string name="cancel_mission">取消稽查</string>
+    <string name="attending">前往稽查中</string>
+    <string name="resolved">已稽查</string>
+    <string name="log_out">登出</string>
+    <string name="log_in">登入</string>
+    <string name="examine_car">稽查車</string>
+    <string name="unattended_mission">未處理之陳情</string>
+    <string name="attended_mission">已處理之陳情</string>
+    <string name="permission_denied">存取被拒</string>
+    <string name="need_company">需陪同</string>
+    <string name="need_reply">需回覆</string>
+    <string name="reporter">陳情人</string>
+    <string name="reason">事由</string>
+    <string name="cellphone">聯絡方式</string>
+    <string name="name">姓名</string>
+    <string name="account">帳號</string>
+    <string name="passwd">密碼</string>
+    <string name="invalid_login">登入資訊有誤</string>
+    <string name="accept">確定</string>
+    <string name="cancel">取消</string>
+</resources>
