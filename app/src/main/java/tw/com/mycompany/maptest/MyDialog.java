@@ -10,6 +10,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.CheckBox;
+import android.widget.TableLayout;
 import android.widget.TextView;
 
 import java.util.zip.Inflater;
@@ -22,20 +23,6 @@ public class MyDialog extends DialogFragment{
         mMyMarker = myMarker;
         return this;
     }
-
-    public class MissionUpdateRunnable implements Runnable{
-        int mId;
-        int mDisp;
-        public MissionUpdateRunnable(int id, int disp)
-        {
-            mId = id;
-            mDisp = disp;
-        }
-        public void run() {
-            String result = DBHelper.updateMission(mId, mDisp);
-            Log.i(MapsActivity.TAG,result);
-        }
-    };
 
 
     @Override
@@ -62,11 +49,13 @@ public class MyDialog extends DialogFragment{
             View tableView = (View) content.findViewById(R.id.dialog_table);
             tableView.setVisibility(View.GONE);
         }
+
         TextView viewReporter = (TextView) content.findViewById(R.id.reporter);
         TextView viewReason = (TextView) content.findViewById(R.id.reason);
         TextView viewCellphone = (TextView) content.findViewById(R.id.cellphone);
         CheckBox checkBoxNeedCompany = (CheckBox) content.findViewById(R.id.need_company_checkbox);
         CheckBox checkBoxNeedReply = (CheckBox) content.findViewById(R.id.need_reply_checkbox);
+
 
         viewReporter.setText(reporter);
         viewReason.setText(reason);
@@ -82,34 +71,31 @@ public class MyDialog extends DialogFragment{
 
                     }
                 });
-        if (mMyMarker.hasData()) {
-            if (mMyMarker.getType() == MyMarker.TYPE.ATTENDING) {
+
+        if (MyMarker.markerSynced.get()) {
+            // if a marker has been attended, then only the attendee can modify its status
+            if (mMyMarker.getType() == MyMarker.TYPE.ATTENDING && mMyMarker.equals( ((MapsActivity)getActivity()).getMap().getAttendingMarker()) ) {
                 builder.setPositiveButton(getString(R.string.stop_mission), new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        mMyMarker.setType(mMyMarker.getType().next()).setHasNoData();
-                        mMyMarker.remove();
-                        Thread thread = new Thread(new MissionUpdateRunnable(mMyMarker.getId(), 1));
-                        thread.start();
-                    }
-                }).setNegativeButton(getString(R.string.cancel_mission),
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                mMyMarker.finishMission();
+                            }
+                        })
+                        .setNegativeButton(getString(R.string.cancel_mission),
                         new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
-                                mMyMarker.setType(mMyMarker.getType().prev()).setHasNoData();
-                                ((MapsActivity)getActivity()).getMap().missionDeselected();
-                                Thread thread = new Thread(new MissionUpdateRunnable(mMyMarker.getId(), -1));
-                                thread.start();
+                            mMyMarker.stopMission();
                             }
                         });
-            } else if (mMyMarker.getType() == MyMarker.TYPE.UNATTENDED){
+            } else if ( mMyMarker.getType() == MyMarker.TYPE.UNATTENDED
+                    && getActivity() != null // in case this dialogue has been detached
+                    && !((MapsActivity)getActivity()).getMap().hasMission()
+                    ){
                 builder.setPositiveButton(getString(R.string.start_mission), new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        mMyMarker.setType(mMyMarker.getType().next()).setHasNoData();
-                        ((MapsActivity)getActivity()).getMap().missionSelected(mMyMarker);
-                        Thread thread = new Thread(new MissionUpdateRunnable(mMyMarker.getId(), 1));
-                        thread.start();
+                        mMyMarker.startMission(((MapsActivity) getActivity()).getUserId());
                     }
                 });
             }

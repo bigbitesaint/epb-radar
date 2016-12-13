@@ -4,33 +4,101 @@
     android:layout_width="match_parent"
     android:orientation="vertical"
     >
-<fragment
-    android:id="@+id/map"
-    android:name="tw.com.mycompany.maptest.MyMap"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:layout_weight="4"
-    tools:context="tw.com.mycompany.maptest.MapsActivity" />
+    <fragment
+        android:id="@+id/map"
+        android:name="tw.com.mycompany.maptest.MyMap"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        tools:context="tw.com.mycompany.maptest.MapsActivity" />
     <TableLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
         android:visibility="gone"
-        android:id="@+id/info_footer"
-        >
-        <TableRow>
+        android:stretchColumns="2"
+        android:id="@+id/info_footer">
+        <TableRow style="@style/TableRowOdd">
             <TextView
-                android:text="test"
+                android:gravity="center"
+                android:text="@string/attending"
+                style="@style/TableHeader"
+                android:id="@+id/footer_header"
+                android:layout_span="4"
                 />
         </TableRow>
-        <TableRow>
+        <TableRow style="@style/TableRowEven">
             <TextView
-                android:text="test"
+                android:text="@string/reporter"
+                android:textStyle="bold"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                style="@style/TableCell"
+                />
+            <TextView
+                android:id="@+id/footer_reporter"
+                android:layout_width="0dp"
+                android:layout_weight="1.5"
+                style="@style/TableCell"
+                />
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:text="@string/need_company"
+                android:textStyle="bold"
+                style="@style/TableCell"
+                android:layout_weight="1"
+                />
+            <CheckBox
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:id="@+id/footer_need_company_checkbox"
+                android:buttonTint="@android:color/holo_red_light"
+                android:clickable="false"
                 />
         </TableRow>
-        <TableRow>
+        <TableRow style="@style/TableRowOdd">
             <TextView
-                android:text="test"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:text="@string/cellphone"
+                android:textStyle="bold"
+                style="@style/TableCell"
+                />
+            <TextView
+                android:id="@+id/footer_cellphone"
+                android:layout_width="0dp"
+                android:layout_weight="1.5"
+                style="@style/TableCell"
+                />
+            <TextView
+                android:layout_height="wrap_content"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:text="@string/need_reply"
+                android:textStyle="bold"
+                style="@style/TableCell"
+                />
+            <CheckBox
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:id="@+id/footer_need_reply_checkbox"
+                android:buttonTint="@android:color/holo_red_light"
+                android:clickable="false"
+                />
+        </TableRow>
+        <TableRow style="@style/TableRowEven">
+            <TextView
+                android:text="@string/reason"
+                android:textStyle="bold"
+                style="@style/TableCell"
+                />
+            <TextView
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:id="@+id/footer_reason"
+                style="@style/TableCell"
                 />
         </TableRow>
     </TableLayout>

@@ -3,8 +3,10 @@ package tw.com.mycompany.maptest;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.location.Location;
 import android.location.LocationManager;
+import android.app.AlertDialog;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -12,18 +14,17 @@ import android.os.Message;
 import android.os.SystemClock;
 import android.support.annotation.NonNull;
 import android.support.v4.content.ContextCompat;
-import android.support.v4.util.ArrayMap;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.CheckBox;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.location.FusedLocationProviderApi;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
@@ -31,14 +32,17 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
-import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.Polyline;
+import com.google.android.gms.maps.model.PolylineOptions;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.sql.Timestamp;
+import java.text.NumberFormat;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -46,17 +50,18 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import tw.com.mycompany.maptest.R;
 
+import static android.support.v7.appcompat.R.styleable.AlertDialog;
+
 
 public class MyMap extends SupportMapFragment implements
         OnMapReadyCallback,
         GoogleMap.OnMarkerClickListener,
-        GoogleMap.OnInfoWindowCloseListener,
         GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener,
         LocationListener
 {
     private GoogleMap mMap;
-    private MyMarker myMarker;
+    private MyMarker carMarker;
     private GoogleApiClient mGoogleApiClient;
     private Location mLastLocation;
     private boolean missionStarted = false;
@@ -64,89 +69,153 @@ public class MyMap extends SupportMapFragment implements
     private static final int MARKER_INTERVAL = 3000;
     private Map<Integer, MyMarker> markerArray = new ConcurrentHashMap<Integer, MyMarker>();
     private MyMarker mAttendingMarker;
-
+    private MyDialog mDialog;
+    private boolean footerExpanded = false;
+    private Polyline mAttendingLine = null;
 
 
 
     /************************************************************************************************
       *Handlers for processing
      **************************************************************************************************/
-    private Handler mHandler = new Handler(Looper.getMainLooper())
+    private Handler mMarkerTrackUpdateProcessHandler = new Handler(Looper.getMainLooper())
     {
         @Override
         // routinely updates markers
         public void handleMessage(Message message)
         {
-            Log.i(MapsActivity.TAG, (String)message.obj);
+            if (getActivity() == null)
+                return;
+
+            Log.i(MapsActivity.TAG, "[POLL]"+(String)message.obj);
+            boolean isAttending = false;
             String[] chunks = ((String)message.obj).split(";");
             for (int it=0; it<chunks.length; ++it)
             {
                 // assign fields
                 MyMarker currMarker = null;
                 String[] fields = chunks[it].split(",");
-                int id = Integer.parseInt(fields[0]);
-                int type = Integer.parseInt(fields[1]);
-                double lat = Double.parseDouble(fields[2]);
-                double lng = Double.parseDouble(fields[3]);
+                int id;
+                int type;
+                int attendee;
+                double lat;
+                double lng;
+                try {
+                    id = Integer.parseInt(fields[0]);
+                    type = Integer.parseInt(fields[1]);
+                    attendee = Integer.parseInt(fields[2]);
+                    lat = Double.parseDouble(fields[3]);
+                    lng = Double.parseDouble(fields[4]);
+                } catch (NumberFormatException nfe)
+                {
+                    Log.e(MapsActivity.TAG, "Number format error!");
+                    continue;
+                }
+                String ts = fields[5];
+                String driver = null;
+                if (fields.length > 6)
+                 driver = fields[6];
 
-                Log.i(MapsActivity.TAG, "Checking id:"+id);
+                // if this marker hasn't been recorded
                 if ( (currMarker=markerArray.get(id)) == null)
                 {
-                    Log.i(MapsActivity.TAG, id+" does't exists.");
                     switch(type)
                     {
                         case 1:
                             markerArray.put(id,
                                     new MyMarker(id,
                                                 MyMarker.TYPE.CAR ,
-                                                mMap.addMarker(new MarkerOptions().position(new LatLng(lat,lng)).icon(MyMarker.CAR_BLUE).title(getString(R.string.examine_car)))));
+                                                mMap.addMarker(new MarkerOptions().position(new LatLng(lat,lng)).icon(MyMarker.getMarkerBitmap("CAR_BLUE"))),
+                                                MyMap.this
+                                    ).setTitle(driver));
                             break;
                         case 2:
                             markerArray.put(id,
                                     new MyMarker(id,
                                                 MyMarker.TYPE.UNATTENDED,
-                                                mMap.addMarker(new MarkerOptions().position(new LatLng(lat,lng)).icon(MyMarker.MARKER_RED).title(getString(R.string.unattended_mission)))));
+                                                mMap.addMarker(new MarkerOptions().position(new LatLng(lat,lng)).icon(MyMarker.getMarkerBitmap("MARKER_RED"))),
+                                                MyMap.this
+                                    ));
                             break;
                         case 3:
                             markerArray.put(id,
                                     new MyMarker(id,
                                                 MyMarker.TYPE.ATTENDING,
-                                                mMap.addMarker(new MarkerOptions().position(new LatLng(lat,lng)).icon(MyMarker.MARKER_BLUE).title(getString(R.string.attended_mission)))));
+                                                mMap.addMarker(new MarkerOptions().position(new LatLng(lat,lng)).icon(MyMarker.getMarkerBitmap("MARKER_BLUE"))),
+                                                MyMap.this
+                                    ));
                             break;
 
                     }
-                }else
+                }else // if this marker is already on map
                 {
-                    currMarker.setPosition(new LatLng(lat,lng));
-                    switch (type)
-                    {
+                    currMarker.setPosition(new LatLng(lat, lng));
+                    currMarker.setExist(true);
+                    switch (type) {
                         case 1:
-                            currMarker.setIcon(MyMarker.CAR_BLUE);
+                            currMarker.setIcon(MyMarker.getMarkerBitmap("CAR_BLUE")).setType(MyMarker.TYPE.CAR).setTitle(driver);
                             break;
                         case 2:
-                            currMarker.setIcon(MyMarker.MARKER_RED).setTitle(getString(R.string.unattended_mission));
+                            currMarker.setIcon(MyMarker.getMarkerBitmap("MARKER_RED")).setType(MyMarker.TYPE.UNATTENDED);
                             break;
                         case 3:
-                            currMarker.setIcon(MyMarker.MARKER_BLUE).setTitle(getString(R.string.attended_mission));
+                            currMarker.setIcon(MyMarker.getMarkerBitmap("MARKER_BLUE")).setType(MyMarker.TYPE.ATTENDING);
                             break;
                         case 4://not supposed to show, clear
                             currMarker.remove();
                             break;
-
                     }
+                }
 
+                // check if I am attending this marker
+                if (attendee == ((MapsActivity)getActivity()).getUserId())
+                {
+                    if (!hasMission()) {
+                        markerArray.get(id).startMission(attendee);
+                    }
+                    missionSelected(markerArray.get(id));
+                    isAttending = true;
                 }
             }
 
+            // delete unused marker & unset exist flag
+            for (Iterator it = markerArray.entrySet().iterator(); it.hasNext(); ) {
+                Map.Entry entry = (Map.Entry) it.next();
+                MyMarker myMarker;
+                if (entry.getValue() instanceof MyMarker)
+                    myMarker =  (MyMarker)entry.getValue();
+                else
+                    continue;
+
+                if (myMarker.getExist() == false) {
+                    markerArray.remove(entry.getKey());
+                    myMarker.remove();
+                    Log.i(MapsActivity.TAG, "Removed!");
+                }else if (myMarker.getId() != 0) // the car representing user himself should be persistent
+                    myMarker.setExist(false);
+
+            }
+
+            if (!isAttending)
+            {
+                missionDeselected();
+            }
+            MyMarker.markerSynced.set(true);
         }
     };
-    private Handler mMarkerHandler = new Handler(Looper.getMainLooper())
+    private Handler mMarkerDetailUpdateProcessHandler = new Handler(Looper.getMainLooper())
     {
         @Override
         // updates marker's details.  only run once per marker
         public void handleMessage(Message message) {
             String[] fields = ((String)message.obj).split(",");
-            int markerId = Integer.parseInt(fields[0]);
+            int markerId=-1;
+            try {
+                markerId = Integer.parseInt(fields[0]);
+            }catch (NumberFormatException nfe)
+            {
+                Log.e(MapsActivity.TAG, "Number format error!");
+            }
             String reporter = fields[1];
             String reason = fields[2];
             String cellphone = fields[3];
@@ -164,14 +233,24 @@ public class MyMap extends SupportMapFragment implements
     };
 
 
-    private Runnable httpProcess = new Runnable(){
+
+    /**************************************************************************************************
+     * prototypes for threads
+     ****************************************************************************************************/
+
+    private Runnable markerTrackUpdatePoller = new Runnable(){
         public void run()
         {
         // while it is not detached
         while (getContext() != null) {
-            Message message = mHandler.obtainMessage();
+            Message message = mMarkerTrackUpdateProcessHandler.obtainMessage();
             String response = DBHelper.executeQuery(((MapsActivity) getContext()).getUserId());
-            if (response.length() > 0)
+            if (response == null)
+            {
+                message.obj = "";
+                message.sendToTarget();
+            }
+            else if (response.length() > 0)
             {
                 message.obj = response;
                 message.sendToTarget();
@@ -185,11 +264,8 @@ public class MyMap extends SupportMapFragment implements
         }
     };
 
-    /**************************************************************************************************
-     * prototypes for threads
-     ****************************************************************************************************/
 
-    private Runnable httpUpdateProcess = new Runnable(){
+    private Runnable markerTrackUpdateProcess = new Runnable(){
         public void run()
         {
             // if it's not detached
@@ -200,7 +276,7 @@ public class MyMap extends SupportMapFragment implements
         }
     };
 
-    private Runnable markerUpdateProcess = new Runnable(){
+    private Runnable markerDetailUpdateProcess = new Runnable(){
         public void run()
         {
             while (true)
@@ -208,7 +284,7 @@ public class MyMap extends SupportMapFragment implements
                 for (Iterator it = markerArray.entrySet().iterator(); it.hasNext(); ) {
                     Map.Entry entry = (Map.Entry) it.next();
                     if (!((MyMarker) entry.getValue()).hasData()) {
-                        Message message = mMarkerHandler.obtainMessage();
+                        Message message = mMarkerDetailUpdateProcessHandler.obtainMessage();
                         String response = DBHelper.getMarkerDetail((int) entry.getKey());
                         if (response != null && response.length() > 0) {
                             message.obj = response;
@@ -229,6 +305,13 @@ public class MyMap extends SupportMapFragment implements
      *************************************************************/
 
     @Override
+    public void onPause(){
+        super.onPause();
+        if (mDialog != null)
+            mDialog.dismiss();
+    }
+
+    @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setHasOptionsMenu(true);
@@ -239,46 +322,38 @@ public class MyMap extends SupportMapFragment implements
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
 
+        // disable rotate function
+        googleMap.getUiSettings().setRotateGesturesEnabled(false);
+
         // A car's default location is at hcepb
-        LatLng hcepb = new LatLng(24.8291459, 121.0113723);
+        LatLng hcepb = new LatLng(24.8280508,121.0132852);
 
         // hook listener
         mMap.setOnMarkerClickListener(this);
 
+
+
         // add user's car on map
-        myMarker = new MyMarker(0, MyMarker.TYPE.CAR,mMap.addMarker(new MarkerOptions().position(hcepb).icon(MyMarker.CAR_RED).title(getString(R.string.examine_car))));
+        carMarker = new MyMarker(0, MyMarker.TYPE.CAR,mMap.addMarker(new MarkerOptions().position(hcepb).icon(MyMarker.getMarkerBitmap("CAR_RED")).title(getString(R.string.examine_car))), this);
         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(hcepb,15));
 
         // add current car marker to marker array
-        markerArray.put(0, myMarker);
+        markerArray.put(0, carMarker);
 
-        // start two background threads
-        Thread thread = new Thread(httpProcess);
-        thread.start();
-
-        Thread threadMarker = new Thread(markerUpdateProcess);
-        threadMarker.start();
-    }
-
-    @Override
-    public void onInfoWindowClose(Marker marker)
-    {
-        missionDeselected();
     }
 
 
     @Override
     public boolean onMarkerClick(Marker marker)
     {
-        MyMarker myMarker = queryMyMarker(marker);
+        MyMarker carMarker = queryMyMarker(marker);
 
         // if the marker is a car, do nothing
-        if (myMarker.getType ()== MyMarker.TYPE.CAR)
-            return true;
+        if (carMarker == null || carMarker.getType ()== MyMarker.TYPE.CAR)
+            return false;
 
-        MyDialog dialog = new MyDialog().setMarker(myMarker);
-        dialog.show(getFragmentManager(),"Notice");
-
+        mDialog = new MyDialog().setMarker(carMarker);
+        mDialog.show(getFragmentManager(),"Notice");
         return false;
     }
 
@@ -289,9 +364,19 @@ public class MyMap extends SupportMapFragment implements
     public void onCreateOptionsMenu(Menu menu, MenuInflater inflater)
     {
         super.onCreateOptionsMenu(menu, inflater);
-        inflater.inflate(R.menu.menu_maps, menu);
     }
 
+    @Override
+    public void onPrepareOptionsMenu(Menu menu)
+    {
+        super.onPrepareOptionsMenu(menu);
+        menu.clear();
+        if (!missionStarted)
+            menu.add(0, R.id.menu_item_map_1, 0, R.string.gps_start);
+        else
+            menu.add(0, R.id.menu_item_map_1, 0, R.string.gps_stop);
+        menu.add(0, R.id.menu_item_map_2, 0, getString(R.string.log_out)+((MapsActivity)getActivity()).getUserName());
+    }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem menuItem)
@@ -299,18 +384,20 @@ public class MyMap extends SupportMapFragment implements
         switch(menuItem.getItemId())
         {
             case R.id.menu_item_map_1:
-
                 if (!missionStarted) {
-                    startMission();
-                    menuItem.setTitle(getString(R.string.stop_mission));
+                    // a user does not necessarily need a destination marker to start mission.
+                    startCarTrack();
                 }
                 else {
-                    stopMission();
-                    menuItem.setTitle(getString(R.string.start_mission));
+                    if (hasMission())
+                    {
+                        Toast.makeText(getContext(),R.string.has_mission_cannot_stop,Toast.LENGTH_LONG).show();
+                    }else
+                        stopCarTrack();
                 }
-                missionStarted = !missionStarted;
                 break;
             case R.id.menu_item_map_2:
+                ((MapsActivity)getActivity()).reset();
                 break;
         }
         return false;
@@ -319,7 +406,13 @@ public class MyMap extends SupportMapFragment implements
     @Override
     public void onConnected(Bundle connectionHint)
     {
+        // start two background threads
+        // it's necessary to start these two threads in this callback, otherwise the handler may be involked while map is not connected
+        Thread thread = new Thread(markerTrackUpdatePoller);
+        thread.start();
 
+        Thread threadMarker = new Thread(markerDetailUpdateProcess);
+        threadMarker.start();
     }
 
     @Override
@@ -353,7 +446,7 @@ public class MyMap extends SupportMapFragment implements
     {
         mLastLocation =location;
         setCarPosition(new LatLng(location.getLatitude(),location.getLongitude()));
-        Thread thread = new Thread(httpUpdateProcess);
+        Thread thread = new Thread(markerTrackUpdateProcess);
         thread.start();
         Log.i(MapsActivity.TAG,"("+location.getLatitude()+","+location.getLongitude()+")");
     }
@@ -389,7 +482,10 @@ public class MyMap extends SupportMapFragment implements
         return true;
     }
 
-
+    public boolean popMyMarker(int id)
+    {
+        return (markerArray.remove(id) != null);
+    }
 
     public MyMarker queryMyMarker(Marker marker)
     {
@@ -405,13 +501,36 @@ public class MyMap extends SupportMapFragment implements
 
     public void setCarPosition(LatLng latlng)
     {
-        myMarker.setPosition(latlng);
-        //mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latlng,15));
+        carMarker.setPosition(latlng);
     }
 
-    public void setAttendingMarker(MyMarker marker)
+    public void updateAttendingLine()
+    {
+        // show connecting line
+        unsetAttendingLine();
+        mAttendingLine = mMap.addPolyline(new PolylineOptions().add(carMarker.getPosition(), mAttendingMarker.getPosition()).width(20.0f).color(Color.parseColor("#80FF0000")));
+    }
+
+    public void unsetAttendingLine()
+    {
+        if (mAttendingLine != null) {
+            mAttendingLine.remove();
+            mAttendingLine = null;
+        }
+    }
+
+    public MyMap setAttendingMarker(MyMarker marker)
     {
         mAttendingMarker = marker;
+        updateAttendingLine();
+        return this;
+    }
+
+    public MyMap unsetAttendingMarker()
+    {
+        mAttendingMarker = null;
+        unsetAttendingLine();
+        return this;
     }
 
     public MyMarker getAttendingMarker()
@@ -419,20 +538,92 @@ public class MyMap extends SupportMapFragment implements
         return mAttendingMarker;
     }
 
-    public void missionSelected(MyMarker myMarker)
+    public GoogleMap getGMap()
     {
+        return mMap;
+    }
+
+    public boolean hasMission()
+    {
+        return (mAttendingMarker != null);
+    }
+
+    public void missionSelected(MyMarker marker)
+    {
+        if (marker != null)
+            setAttendingMarker(marker);
+
+
+        // check mMap to know whether google map is ready
+        if (mMap != null)
+            startCarTrack();
+    /*
+       Fill footer view
+       */
         View footer = (View)getActivity().findViewById(R.id.info_footer);
-        footer.setVisibility(View.VISIBLE);
+        TextView header = (TextView)getActivity().findViewById(R.id.footer_header);
+        TextView reporter = (TextView)getActivity().findViewById(R.id.footer_reporter);
+        TextView reason = (TextView)getActivity().findViewById(R.id.footer_reason);
+        TextView cellphone = (TextView)getActivity().findViewById(R.id.footer_cellphone);
+        CheckBox need_company = (CheckBox)getActivity().findViewById(R.id.footer_need_company_checkbox);
+        CheckBox need_reply = (CheckBox)getActivity().findViewById(R.id.footer_need_reply_checkbox);
+        if (!reason.hasOnClickListeners()) {
+            reason.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    footerExpanded = !footerExpanded;
+                    missionSelected(null);
+                }
+            });
+        }
+        if (!header.hasOnClickListeners()) {
+            header.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    mMap.moveCamera(CameraUpdateFactory.newLatLng(mAttendingMarker.getPosition()));
+                }
+            });
+        }
+        if (mAttendingMarker.hasData()) {
+            // show footer only when data is available
+            footer.setVisibility(View.VISIBLE);
+
+            reporter.setText(mAttendingMarker.getReporter());
+            cellphone.setText(mAttendingMarker.getCellphone());
+            need_company.setChecked(mAttendingMarker.getNeedCompany());
+            need_reply.setChecked(mAttendingMarker.getNeedReply());
+            String reasonText = mAttendingMarker.getReason();
+            if (!footerExpanded && reasonText.length() > 8)
+                reasonText = reasonText.substring(0, 8).concat("...");
+            reason.setText(reasonText);
+        }
+
     }
 
     public void missionDeselected()
     {
+        unsetAttendingMarker();
+        // hide footer
         View footer = (View)getActivity().findViewById(R.id.info_footer);
         footer.setVisibility(View.GONE);
     }
 
-    public void startMission()
+    public void stopCarTrack()
     {
+        if (!missionStarted)
+            return;
+        missionStarted = false;
+        // mark car as stopped
+        carMarker.setIcon(MyMarker.getMarkerBitmap("CAR_RED"));
+        // stop GPS tracker
+        LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, this);
+    }
+
+    public void startCarTrack(){
+        if (missionStarted)
+            return;
+
+        // start GPS tracker
         LocationManager lm = (LocationManager) getActivity().getBaseContext().getSystemService(Context.LOCATION_SERVICE);
         boolean gpsEnabled, networkEnabled;
         networkEnabled = lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
@@ -440,6 +631,9 @@ public class MyMap extends SupportMapFragment implements
         if (ContextCompat.checkSelfPermission(getActivity(), android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED)
             return;
         if (networkEnabled && gpsEnabled) {
+            missionStarted = true;
+            // mark car as started
+            carMarker.setIcon(MyMarker.getMarkerBitmap("CAR_BLUE"));
             mLastLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
             if (mLastLocation != null) {
                 setCarPosition(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()));
@@ -449,14 +643,23 @@ public class MyMap extends SupportMapFragment implements
             mLocationRequest.setInterval(GPS_INTERVAL);
             mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
             LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
-        }else
-            Toast.makeText(getContext(),"GPS or NETWORK unavailable!", Toast.LENGTH_SHORT).show();
-        myMarker.setIcon(MyMarker.CAR_BLUE);
+        }else{
+            //Toast.makeText(getContext(),"GPS or NETWORK unavailable!", Toast.LENGTH_SHORT).show();
+            AlertDialog alertDialog = new AlertDialog.Builder(getActivity()).create();
+            alertDialog.setMessage(getString(R.string.need_gps));
+            alertDialog.setTitle(getString(R.string.error));
+            alertDialog.setButton(android.app.AlertDialog.BUTTON_NEUTRAL, getString(R.string.retry), new DialogInterface.OnClickListener(){
+                @Override
+                public void onClick(DialogInterface dialogInterface, int which)
+                {
+                    dialogInterface.dismiss();
+                    startCarTrack();
+                }
+            });
+            alertDialog.show();
+        }
+
+
     }
 
-    public void stopMission()
-    {
-        LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, this);
-        myMarker.setIcon(MyMarker.CAR_RED);
-    }
 }

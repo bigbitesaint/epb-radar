@@ -4,16 +4,14 @@ import android.util.Log;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.Map;
+
 
 public class DBHelper{
     private static final String baseUrl = "http://172.23.2.230";
+    //private static final String baseUrl = "http://www.hcepb.gov.tw/app";
 
     private static String doQuery(String qry)
     {
@@ -62,9 +60,13 @@ public class DBHelper{
         return doQuery(baseUrl+"/app_webapi.php?action=getmarkers&id="+id);
     }
 
-    public static String updateMission(int markerId, int disp)
+    public static String updateMission(int markerId, int type, int userId)
     {
-        return doQuery(baseUrl+"/app_webapi.php?action=updatemarker&id="+markerId+"&disp="+disp);
+        return doQuery(baseUrl+"/app_webapi.php?action=updatemarker&id="+markerId+"&type="+type+"&attendee="+userId);
+    }
+
+    public static String doValidate(String userName, String passwd){
+        return doQuery(baseUrl+"/app_webapi.php?action=validate&user_name="+userName+"&passwd="+passwd);
     }
 }
 

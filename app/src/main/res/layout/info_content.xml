@@ -5,7 +5,6 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:theme="@style/default_dialog_theme"
     >
     <LinearLayout
         android:layout_width="match_parent"
@@ -36,7 +35,7 @@
             style="@style/TableCell"
             />
     </TableRow>
-    <TableRow style="@style/TableRowEven">
+    <TableRow style="@style/TableRowEven" android:id="@+id/dialog_tablerow_reason">
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"

@@ -1,15 +1,18 @@
 <resources>
     <string name="app_name">MapTest</string>
-    <string name="title_activity_maps">Map</string>
+    <string name="title_activity_maps">新竹縣政府環保局稽查系統</string>
     <string name="start_button">Start</string>
     <string name="stop_button">Stop</string>
+    <string name="gps_start">開啟GPS追蹤</string>
+    <string name="gps_stop">停止GPS追蹤</string>
     <string name="start_mission">開始稽查</string>
     <string name="stop_mission">完成稽查</string>
     <string name="cancel_mission">取消稽查</string>
-    <string name="attending">前往稽查中</string>
+    <string name="attending">前往稽查中...</string>
     <string name="resolved">已稽查</string>
     <string name="log_out">登出</string>
     <string name="log_in">登入</string>
+    <string name="retry">重試</string>
     <string name="examine_car">稽查車</string>
     <string name="unattended_mission">未處理之陳情</string>
     <string name="attended_mission">已處理之陳情</string>
@@ -25,4 +28,8 @@
     <string name="invalid_login">登入資訊有誤</string>
     <string name="accept">確定</string>
     <string name="cancel">取消</string>
+    <string name="has_mission_cannot_stop">仍有任務稽查中，無法停止GPS追蹤</string>
+    <string name="need_gps">GPS尚未開啟</string>
+    <string name="error">錯誤</string>
+    <string name="remember_me">記住我</string>
 </resources>
