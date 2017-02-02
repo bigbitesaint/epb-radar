@@ -16,11 +16,11 @@ import android.widget.TextView;
 import java.util.zip.Inflater;
 
 public class MyDialog extends DialogFragment{
-    MyMarker mMyMarker=null;
+    MapMarker mMyMarker=null;
 
-    public MyDialog setMarker(MyMarker myMarker)
+    public MyDialog setMarker(MapMarker MapMarker)
     {
-        mMyMarker = myMarker;
+        mMyMarker = MapMarker;
         return this;
     }
 
@@ -72,9 +72,9 @@ public class MyDialog extends DialogFragment{
                     }
                 });
 
-        if (MyMarker.markerSynced.get()) {
+        if (MapMarker.markerSynced.get()) {
             // if a marker has been attended, then only the attendee can modify its status
-            if (mMyMarker.getType() == MyMarker.TYPE.ATTENDING && mMyMarker.equals( ((MapsActivity)getActivity()).getMap().getAttendingMarker()) ) {
+            if (mMyMarker.getType() == MapMarker.TYPE.ATTENDING && mMyMarker.equals( ((MapsActivity)getActivity()).getMap().getAttendingMarker()) ) {
                 builder.setPositiveButton(getString(R.string.stop_mission), new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
@@ -88,7 +88,7 @@ public class MyDialog extends DialogFragment{
                             mMyMarker.stopMission();
                             }
                         });
-            } else if ( mMyMarker.getType() == MyMarker.TYPE.UNATTENDED
+            } else if ( mMyMarker.getType() == MapMarker.TYPE.UNATTENDED
                     && getActivity() != null // in case this dialogue has been detached
                     && !((MapsActivity)getActivity()).getMap().hasMission()
                     ){
